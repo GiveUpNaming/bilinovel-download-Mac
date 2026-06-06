@@ -28,7 +28,20 @@ class MainThread(QThread):
             out_path = read_config_dict('download_path')
             interval = read_config_dict('interval')
             num_thread = read_config_dict('numthread')
-            downloader_router(out_path, book_no, volumn_no, interval, num_thread, True, self.parent.hang_signal, self.parent.progressring_signal, self.parent.cover_signal, self.parent.editline_hang)
+            browser = read_config_dict('browser') or 'Auto'
+            downloader_router(
+                out_path,
+                book_no,
+                volumn_no,
+                interval,
+                num_thread,
+                True,
+                self.parent.hang_signal,
+                self.parent.progressring_signal,
+                self.parent.cover_signal,
+                self.parent.editline_hang,
+                browser=browser,
+            )
             self.parent.end_signal.emit('')
         except Exception as e:
             self.parent.end_signal.emit('')

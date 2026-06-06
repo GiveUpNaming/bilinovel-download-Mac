@@ -14,13 +14,22 @@ from PIL import Image
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from DrissionPage import Chromium, ChromiumOptions
 import tempfile
+from backend.bilinovel.browser import create_browser
 
 lock = threading.RLock()
 
 class Editer(object):
-    def __init__(self, root_path, book_no='0000', volume_no=1, interval=0, num_thread=1):
+    def __init__(
+        self,
+        root_path,
+        book_no='0000',
+        volume_no=1,
+        interval=0,
+        num_thread=1,
+        browser='auto',
+        browser_path=None,
+    ):
 
         self.url_head = 'https://www.linovelib.com'
         self.header = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.67 Safari/537.36 Edg/87.0.664.47', 'referer': self.url_head, 'cookie':'night=1'}
@@ -32,13 +41,16 @@ class Editer(object):
         self.color_chap_name = '插图'
         self.color_page_name = '彩页'
         self.html_buffer = dict()
+        self.pool = ThreadPoolExecutor(int(num_thread))
+        self.browser = None
 
-        path = r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'  # 请改为你电脑内Chrome可执行文件路径
-        co = ChromiumOptions().set_browser_path(path)
-        self.tab = Chromium(co).latest_tab
-        
-        main_html = self.get_html(self.main_page)
-        self.get_meta_data(main_html)
+        try:
+            self.browser = create_browser(browser, browser_path)
+            main_html = self.get_html(self.main_page)
+            self.get_meta_data(main_html)
+        except Exception:
+            self.close()
+            raise
             
         self.img_url_map = dict()
         self.volume_no = volume_no
@@ -54,7 +66,6 @@ class Editer(object):
         self.ignore_urls = []
         self.url_buffer = []
         self.max_thread_num = 8
-        self.pool = ThreadPoolExecutor(int(num_thread))
         
     # # 获取html文档内容
     # def get_html(self, url, is_gbk=False):
@@ -76,33 +87,27 @@ class Editer(object):
 
     def get_html(self, url, is_gbk=False, is_main_text=False):
         while True:
-            self.tab.get(url)
-            req = self.tab.html
+            req = self.browser.get_html(
+                url,
+                clean_hidden_paragraphs=is_main_text,
+            )
             while '<title>Access denied | www.linovelib.com used Cloudflare to restrict access</title>' in req:
                 print('下载频繁，触发反爬，5秒后重试....')
                 time.sleep(5)
-                self.tab.get(url)
-                req = self.tab.html
+                req = self.browser.get_html(
+                    url,
+                    clean_hidden_paragraphs=is_main_text,
+                )
             if is_gbk:
-                req.encoding = 'GBK'       #这里是网页的编码转换，根据网页的实际需要进行修改，经测试这个编码没有问题
+                req = req.encode('latin1', errors='ignore').decode(
+                    'gbk',
+                    errors='ignore',
+                )
             break
 
 
         if is_main_text:
             bf = BeautifulSoup(req, 'html.parser')
-            p_eles = self.tab.eles('tag:p')
-            for p in p_eles:
-                if p.style(style='display') == 'none':
-                    all_attrs = p.attrs
-                    for key in all_attrs.keys():
-                        if 'data-' in key:
-                            class_key = key
-                            class_value = all_attrs[class_key]
-                    # class_value = p.attr('class')
-                    p_elements_to_remove = bf.find_all('p', {class_key: class_value})
-                    for p in p_elements_to_remove:
-                        p.decompose()
-
             p_tags = bf.find_all('p')
             for p in p_tags:
                 all_attrs = p.attrs
@@ -118,6 +123,14 @@ class Editer(object):
         if self.interval>0:
             time.sleep(self.interval)
         return req
+
+    def close(self):
+        if self.pool is not None:
+            self.pool.shutdown(wait=False, cancel_futures=True)
+            self.pool = None
+        if self.browser is not None:
+            self.browser.close()
+            self.browser = None
     
     def get_html_content(self, url, is_buffer=False):
         if is_buffer:
@@ -449,12 +462,27 @@ class Editer(object):
 
     def get_epub(self):
         epub_file = self.epub_path + '/' + check_chars(self.book_name + '-' + self.volume['volume_name']) + '.epub'
-        with zipfile.ZipFile(epub_file, "w", zipfile.ZIP_DEFLATED) as zf:
+        mimetype_path = os.path.join(self.temp_path, 'mimetype')
+        with zipfile.ZipFile(epub_file, "w") as zf:
+            zf.write(
+                mimetype_path,
+                'mimetype',
+                compress_type=zipfile.ZIP_STORED,
+            )
             for dirpath, _, filenames in os.walk(self.temp_path):
-                fpath = dirpath.replace(self.temp_path,'') #这一句很重要，不replace的话，就从根目录开始复制
-                fpath = fpath and fpath + os.sep or ''
-                for filename in filenames:
-                    zf.write(os.path.join(dirpath, filename), fpath+filename)
+                for filename in sorted(filenames):
+                    file_path = os.path.join(dirpath, filename)
+                    if file_path == mimetype_path:
+                        continue
+                    archive_path = os.path.relpath(
+                        file_path,
+                        self.temp_path,
+                    ).replace(os.sep, '/')
+                    zf.write(
+                        file_path,
+                        archive_path,
+                        compress_type=zipfile.ZIP_DEFLATED,
+                    )
         self.temp_path_io.cleanup()
         return epub_file
     

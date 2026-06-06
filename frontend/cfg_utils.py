@@ -10,22 +10,25 @@ CREATE TABLE IF NOT EXISTS config (
 );
 '''
 
-initial_config = {"download_path": './', "theme": "Auto", "interval": "4500", "numthread": '4'}
+initial_config = {
+    "download_path": './',
+    "theme": "Auto",
+    "interval": "4500",
+    "numthread": '4',
+    "browser": "Auto",
+}
 
 def initialize_db():
-    if not os.path.exists(DBPATH):
-        with sqlite3.connect(DBPATH) as conn:
-            cursor = conn.cursor()
-            cursor.execute("PRAGMA journal_mode=DELETE")
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS config (
-                KEY TEXT PRIMARY KEY,
-                VALUE TEXT
-            );
-            ''')
-            for key, value in initial_config.items():
-                cursor.execute("INSERT OR REPLACE INTO config (KEY, VALUE) VALUES (?, ?)", (key, value))
-            conn.commit()
+    with sqlite3.connect(DBPATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA journal_mode=DELETE")
+        cursor.execute(CREATE_CONFIG_TABLE_SQL)
+        for key, value in initial_config.items():
+            cursor.execute(
+                "INSERT OR IGNORE INTO config (KEY, VALUE) VALUES (?, ?)",
+                (key, value),
+            )
+        conn.commit()
 
 def read_config_dict(key=None):
     with sqlite3.connect(DBPATH) as conn:

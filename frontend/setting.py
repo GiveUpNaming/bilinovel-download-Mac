@@ -50,7 +50,26 @@ class SettingWidget(ScrollArea):
             self.tr('小说插画下载线程数量'),
             self.tr('适当增加充分利用带宽,但不要太高'),
             self.setting_group
-        ) 
+        )
+
+        browser_name = read_config_dict('browser') or 'Auto'
+        self.browserMode = OptionsConfigItem(
+            None,
+            "BrowserMode",
+            browser_name,
+            OptionsValidator(["Auto", "Safari", "Chromium"]),
+            None,
+        )
+        self.browser_card = OptionsSettingCard(
+            self.browserMode,
+            FIF.SETTING,
+            self.tr('网页浏览器'),
+            self.tr('macOS 上“自动”会使用 Safari'),
+            texts=[
+                self.tr('自动'), self.tr('Safari'), self.tr('Chromium')
+            ],
+            parent=self.setting_group
+        )
 
         self.theme_card = OptionsSettingCard(
             self.themeMode,
@@ -97,6 +116,7 @@ class SettingWidget(ScrollArea):
         self.setting_group.addSettingCard(self.download_path_card)
         self.setting_group.addSettingCard(self.interval_card)
         self.setting_group.addSettingCard(self.thread_card)
+        self.setting_group.addSettingCard(self.browser_card)
         self.setting_group.addSettingCard(self.theme_card)
         self.expandLayout.setSpacing(28)
         self.expandLayout.setContentsMargins(20, 10, 20, 0)
@@ -106,6 +126,7 @@ class SettingWidget(ScrollArea):
         self.theme_card.optionChanged.connect(self.theme_changed)
         self.interval_card.valueChanged.connect(self.interval_changed)
         self.thread_card.valueChanged.connect(self.thread_changed)
+        self.browser_card.optionChanged.connect(self.browser_changed)
 
 
     def download_path_changed(self):
@@ -136,6 +157,16 @@ class SettingWidget(ScrollArea):
     def thread_changed(self):
         num_thread = self.thread_card.valueLabel.text()
         write_config_dict("numthread", num_thread)
+        self.delete()
+
+    def browser_changed(self):
+        browser_labels = {
+            '自动': 'Auto',
+            'Safari': 'Safari',
+            'Chromium': 'Chromium',
+        }
+        browser_name = browser_labels[self.browser_card.choiceLabel.text()]
+        write_config_dict("browser", browser_name)
         self.delete()
     
     def delete(self):
