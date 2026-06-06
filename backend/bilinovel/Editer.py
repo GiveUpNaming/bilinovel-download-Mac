@@ -16,6 +16,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 import tempfile
 from backend.bilinovel.browser import create_browser
+from backend.bilinovel.threading_utils import shutdown_executor
 
 lock = threading.RLock()
 
@@ -126,7 +127,7 @@ class Editer(object):
 
     def close(self):
         if self.pool is not None:
-            self.pool.shutdown(wait=False, cancel_futures=True)
+            shutdown_executor(self.pool)
             self.pool = None
         if self.browser is not None:
             self.browser.close()
