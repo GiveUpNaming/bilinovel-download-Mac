@@ -1,104 +1,61 @@
-<div align="center" style="margin: 10px 0;">
-  <img src="resource/logo_big.png" style="height: 100px;"/>
-</div>
 
-<h1 align="center" style="margin-top: 20px;">
-  哔哩轻小说和漫画 EPUB 下载器
-</h1>
 
-<div align="center">
-  <img src="resource/example.png" width="800"/>
-</div>
+## 项目来源
 
-[哔哩轻小说](https://www.linovelib.com)与[哔哩漫画](https://www.bilimanga.net)网站小说漫画下载与EPUB打包。
+本项目基于 [ShqWW/bilinovel-download](https://github.com/ShqWW/bilinovel-download) 修改。
 
-特性:
+Windows 版本、Chromium 下载流程、图形界面、漫画下载和 EPUB 生成功能均来自原项目。本仓库主要维护 macOS 与 Safari 的适配，不再重复介绍原项目已有功能；完整的 Windows 使用说明请查看原项目。
 
-* Fluent Design风格界面，下载进度与书籍封面显示，主题切换，下载目录自定义。
-* 前后端分离，同时支持命令行版本。
-* EPUB格式打包，支持多种阅读器。
-* 小说下载支持 Windows Chromium 和 macOS Safari。
-* 支持[Kavita](https://www.kavitareader.com/)归档整理。
-* 正文黑白插图和彩页插图智能排版。
-* 书籍批量下载。
-* 插图多线程下载。
-* 访问时间间隔自定义调整。
-* 缺失链接自动修复。
-* 插图页不存在时手动指定彩页。
-* ...................
+## 本仓库添加的内容
 
-有建议或bug可以提issue，由于软件更新频繁，可以加QQ群获得更多信息：563072544
-
-图形界面使用[PyQt-Fluent-Widgets](https://pyqt-fluent-widgets.readthedocs.io/en/latest/index.html)界面编写。
-
-系统要求：
-
-* Windows 10 及以上：使用 Chrome 或 Edge。
-* macOS：使用系统 Safari，需允许远程自动化。
-
+* 增加 macOS 支持，并通过 Selenium 调用系统 Safari 下载哔哩轻小说。
+* 抽象 Safari 与 Chromium 浏览器后端：macOS 默认选择 Safari，其他系统默认选择 Chromium。
+* 命令行增加 `--browser` 和 `--browser-path` 参数，可手动选择浏览器或指定 Chromium 可执行文件。
+* 图形界面的设置页增加“自动 / Safari / Chromium”浏览器选项，并兼容已有配置。
+* 针对 Safari 增加正文隐藏段落清理、缓存规避、旧页面检测重试和网页弹窗处理。
+* 每个下载任务结束后关闭浏览器与线程池，便于在同一次命令行会话中继续下载其他书籍。
+* 调整 EPUB 打包方式，使 `mimetype` 位于压缩包首项并保持不压缩，提高阅读器兼容性。
+* 增加浏览器选择、Safari 页面处理、配置迁移和线程池关闭的测试。
 
 ## 安装
-### 使用前安装需要的包
-```
+
+```bash
 pip install -r requirements.txt -i https://pypi.org/simple/
 ```
-### 使用命令行模式下载小说:
-```
-python bilinovel.py
-```
 
-macOS 会默认使用 Safari，也可以显式指定：
+### Safari 首次设置
 
-```
-python bilinovel.py --browser safari
-```
-
-使用 Chrome 或 Edge 时可指定 Chromium 后端和可执行文件：
-
-```
-python bilinovel.py --browser chromium --browser-path "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-```
-
-### 使用命令行模式下载漫画:
-```
-python bilimanga.py
-```
-
-### 使用图形界面运行:
-```
-python main.py
-```
-在主界面选择下载小说/漫画
-
-### macOS Safari 首次设置
-
-1. 打开 Safari，在设置的“高级”部分显示网页开发者功能。
-2. 打开“开发”菜单中的“开发者设置”，勾选“允许远程自动化”。
+1. 打开 Safari，在“设置 > 高级”中启用网页开发者功能。
+2. 打开“开发 > 开发者设置”，勾选“允许远程自动化”。
 3. 在终端执行：
 
-```
+```bash
 safaridriver --enable
 ```
 
-4. 安装依赖后运行 `python bilinovel.py --browser safari`，或在图形界面的设置页选择 Safari。
+## 执行示例
 
-下载过程中 Safari 会由系统 `safaridriver` 自动控制。完成后 EPUB 会写入所选下载目录，可使用 Apple Books、Calibre 或其他 EPUB 阅读器打开。
+下面的例子使用 Safari，将文件保存到 `./out`，请求间隔为 4500 毫秒，并使用 4 个插图下载线程：
 
-### 使用pyinstaller打包:
+```bash
+python bilinovel.py \
+  --browser safari \
+  --out_path ./out \
+  --interval 4500 \
+  --num_thread 4
 ```
-pyinstaller -F -w -i .\resource\logo.png -n bili-download .\main.py
+
+程序启动后按提示输入书号和卷号。例如：
+
+```text
+请输入书籍号：2704
+请输入卷号(查看目录信息不输入直接按回车，下载多卷请使用逗号分隔或者连字符-)：1-3
 ```
 
-## 相关项目：
+卷号留空可先查看目录；输入 `1,3,5` 或 `1-3` 可下载多卷。一次任务完成后可以继续输入下一本书，按 `Ctrl+D` 退出。
 
-* [轻小说文库EPUB下载器](https://github.com/ShqWW/lightnovel-download)
+图形界面仍可通过以下命令启动：
 
-* [哔哩轻小说EPUB下载器](https://github.com/ShqWW/bilinovel-download)
-
-* [拷贝漫画EPUB下载器](https://github.com/ShqWW/copymanga-download)
-
-
-## EPUB书籍编辑和管理工具推荐：
-1. [Sigil](https://sigil-ebook.com/) 
-2. [Calibre](https://www.calibre-ebook.com/)
-3. [Kavita](https://www.kavitareader.com/)
+```bash
+python main.py
+```
