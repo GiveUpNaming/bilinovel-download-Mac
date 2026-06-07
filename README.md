@@ -19,8 +19,9 @@ Windows 版本、Chromium 下载流程、图形界面、漫画下载和 EPUB 生
 
 ## 安装
 
+下载过慢换清华源
 ```bash
-pip install -r requirements.txt -i https://pypi.org/simple/
+pip install -r requirements.txt
 ```
 
 ### Safari 首次设置
