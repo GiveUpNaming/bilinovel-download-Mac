@@ -22,6 +22,10 @@ class ConfigMigrationTest(unittest.TestCase):
                 cfg_utils.initialize_db()
                 self.assertEqual(cfg_utils.read_config_dict('theme'), 'Dark')
                 self.assertEqual(cfg_utils.read_config_dict('browser'), 'Auto')
+                self.assertEqual(
+                    cfg_utils.read_config_dict('novel_site'),
+                    'Bilinovel',
+                )
 
 
 if __name__ == '__main__':

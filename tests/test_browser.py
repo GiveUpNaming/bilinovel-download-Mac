@@ -48,6 +48,16 @@ class BrowserFactoryTest(unittest.TestCase):
 
 
 class SafariBrowserTest(unittest.TestCase):
+    def test_cleanup_script_removes_zero_height_positioned_paragraphs(self):
+        self.assertIn(
+            "style.position === 'absolute'",
+            browser.HIDDEN_PARAGRAPH_CLEANUP_SCRIPT,
+        )
+        self.assertIn(
+            'rectangle.height === 0',
+            browser.HIDDEN_PARAGRAPH_CLEANUP_SCRIPT,
+        )
+
     def test_safari_fetches_and_cleans_html(self):
         driver = MagicMock()
         driver.execute_script.side_effect = [
@@ -83,6 +93,12 @@ class SafariBrowserTest(unittest.TestCase):
     def test_safari_does_not_modify_non_bilinovel_urls(self):
         url = 'data:text/html,<html></html>'
         self.assertEqual(browser.SafariBrowser._add_cache_buster(url), url)
+
+    def test_safari_adds_cache_buster_to_bilinovel(self):
+        url = browser.SafariBrowser._add_cache_buster(
+            'https://www.bilinovel.com/novel/1/2.html'
+        )
+        self.assertIn('bilinovel_cache', parse_qs(urlsplit(url).query))
 
     def test_safari_accepts_unexpected_alert_and_retries(self):
         class UnexpectedAlertPresentException(Exception):

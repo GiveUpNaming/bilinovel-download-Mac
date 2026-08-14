@@ -29,6 +29,7 @@ class MainThread(QThread):
             interval = read_config_dict('interval')
             num_thread = read_config_dict('numthread')
             browser = read_config_dict('browser') or 'Auto'
+            site = read_config_dict('novel_site') or 'Bilinovel'
             downloader_router(
                 out_path,
                 book_no,
@@ -41,6 +42,7 @@ class MainThread(QThread):
                 self.parent.cover_signal,
                 self.parent.editline_hang,
                 browser=browser,
+                site=site,
             )
             self.parent.end_signal.emit('')
         except Exception as e:

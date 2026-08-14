@@ -16,6 +16,7 @@ initial_config = {
     "interval": "4500",
     "numthread": '4',
     "browser": "Auto",
+    "novel_site": "Bilinovel",
 }
 
 def initialize_db():

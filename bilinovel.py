@@ -20,6 +20,12 @@ def parse_args():
         default=None,
         help='Chromium 可执行文件路径，Safari 不需要设置',
     )
+    parser.add_argument(
+        '--site',
+        default='bilinovel',
+        choices=('bilinovel', 'linovelib'),
+        help='小说来源站点；默认使用 bilinovel.com',
+    )
     args = parser.parse_args()
     return args
 
@@ -41,6 +47,7 @@ if __name__=='__main__':
             num_thread=args.num_thread,
             browser=args.browser,
             browser_path=args.browser_path,
+            site=args.site,
         )
         # book_no = '2704'
         # volume_no = '1'

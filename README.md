@@ -9,6 +9,7 @@ Windows 版本、Chromium 下载流程、图形界面、漫画下载和 EPUB 生
 ## 本仓库添加的内容
 
 * 增加 macOS 支持，并通过 Selenium 调用系统 Safari 下载哔哩轻小说。
+* 支持 `bilinovel.com` 移动版页面，同时保留 `linovelib.com` 下载兼容。
 * 抽象 Safari 与 Chromium 浏览器后端：macOS 默认选择 Safari，其他系统默认选择 Chromium。
 * 命令行增加 `--browser` 和 `--browser-path` 参数，可手动选择浏览器或指定 Chromium 可执行文件。
 * 图形界面的设置页增加“自动 / Safari / Chromium”浏览器选项，并兼容已有配置。
@@ -43,10 +44,14 @@ safaridriver --enable
 ```bash
 python bilinovel.py \
   --browser safari \
+  --site bilinovel \
   --out_path ./out \
   --interval 4500 \
   --num_thread 4
 ```
+
+`--site` 可选 `bilinovel`（默认）或 `linovelib`。图形界面可在设置页的
+“小说来源站点”中切换。
 
 程序启动后按提示输入书号和卷号。例如：
 

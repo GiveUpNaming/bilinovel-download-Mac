@@ -71,6 +71,23 @@ class SettingWidget(ScrollArea):
             parent=self.setting_group
         )
 
+        site_name = read_config_dict('novel_site') or 'Bilinovel'
+        self.siteMode = OptionsConfigItem(
+            None,
+            "NovelSiteMode",
+            site_name,
+            OptionsValidator(["Bilinovel", "Linovelib"]),
+            None,
+        )
+        self.site_card = OptionsSettingCard(
+            self.siteMode,
+            FIF.SETTING,
+            self.tr('小说来源站点'),
+            self.tr('默认使用 bilinovel.com'),
+            texts=[self.tr('Bilinovel'), self.tr('Linovelib')],
+            parent=self.setting_group,
+        )
+
         self.theme_card = OptionsSettingCard(
             self.themeMode,
             FIF.BRUSH,
@@ -117,6 +134,7 @@ class SettingWidget(ScrollArea):
         self.setting_group.addSettingCard(self.interval_card)
         self.setting_group.addSettingCard(self.thread_card)
         self.setting_group.addSettingCard(self.browser_card)
+        self.setting_group.addSettingCard(self.site_card)
         self.setting_group.addSettingCard(self.theme_card)
         self.expandLayout.setSpacing(28)
         self.expandLayout.setContentsMargins(20, 10, 20, 0)
@@ -127,6 +145,7 @@ class SettingWidget(ScrollArea):
         self.interval_card.valueChanged.connect(self.interval_changed)
         self.thread_card.valueChanged.connect(self.thread_changed)
         self.browser_card.optionChanged.connect(self.browser_changed)
+        self.site_card.optionChanged.connect(self.site_changed)
 
 
     def download_path_changed(self):
@@ -167,6 +186,13 @@ class SettingWidget(ScrollArea):
         }
         browser_name = browser_labels[self.browser_card.choiceLabel.text()]
         write_config_dict("browser", browser_name)
+        self.delete()
+
+    def site_changed(self):
+        site_name = self.site_card.choiceLabel.text()
+        write_config_dict("novel_site", site_name)
+        self.parent.novel_text = self.parent.get_novel_help_text()
+        self.parent.NovelInterface.text_screen.setText(self.parent.novel_text)
         self.delete()
     
     def delete(self):

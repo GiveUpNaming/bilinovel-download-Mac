@@ -28,8 +28,8 @@ class MainWindow(FluentWindow):
 
         initialize_db()
         self.out_path = read_config_dict("download_path")
+        self.novel_text = self.get_novel_help_text()
         split_str = '--------------------------------\n    '
-        self.novel_text = f'使用说明（必看）：\n{split_str}1. https://www.linovelib.com，输入书号以及下载的卷号，例如网址是https://www.linovelib.com/novel/2704.html，则书号输入2704。若不确定卷号，可以只输入书号，点击确定会返回书籍卷名称和对应的卷号。\n{split_str}3.要下载编号[2]对应卷，则卷号输入2。想下载多卷比如[1]至[3]对应卷，则卷号输入1-3或1,2,3（英文逗号分隔，编号可以不连续）。'
         self.manga_text = f'使用说明（必看）：\n{split_str}1.https://www.bilicomic.net，输入漫画号以及下载的卷号，例如网址是https://www.bilicomic.net/detail/498.html，则漫号输入498。若不确定卷号，可以只输入漫号，点击确定会返回漫画卷名称和对应的卷号。\n{split_str}3.要下载编[2]对应卷，则卷号输入2。想下载多卷比如[1]至[3]对应卷，则卷号输入1-3或1,2,3（英文逗号分隔，编号可以不连续）。'
         self.interval = read_config_dict('interval')
         self.NovelInterface = NovelWidget('Novel Interface', self)
@@ -39,6 +39,18 @@ class MainWindow(FluentWindow):
         self.initWindow()
         QTimer.singleShot(50, lambda: self.set_theme(read_config_dict('theme')))
         QTimer.singleShot(2000, lambda: self.splashScreen.close())
+
+    def get_novel_help_text(self):
+        site = (read_config_dict('novel_site') or 'Bilinovel').lower()
+        host = 'www.linovelib.com' if site == 'linovelib' else 'www.bilinovel.com'
+        split_str = '--------------------------------\n    '
+        return (
+            f'使用说明（必看）：\n{split_str}1. https://{host}，输入书号以及下载的卷号，'
+            f'例如网址是 https://{host}/novel/2704.html，则书号输入 2704。若不确定卷号，'
+            f'可以只输入书号，点击确定会返回书籍卷名称和对应的卷号。\n{split_str}'
+            '2. 要下载编号 [2] 对应卷，则卷号输入 2。想下载多卷比如 [1] 至 [3]，'
+            '卷号输入 1-3 或 1,2,3（英文逗号分隔，编号可以不连续）。'
+        )
         
     def initNavigation(self):
         self.addSubInterface(self.NovelInterface, FIF.BOOK_SHELF, '哔哩轻小说')

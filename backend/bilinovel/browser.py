@@ -8,8 +8,18 @@ HIDDEN_PARAGRAPH_CLEANUP_SCRIPT = """
 const paragraphs = Array.from(document.querySelectorAll('p'));
 const hiddenMarkers = [];
 
+function isHiddenParagraph(paragraph) {
+    const style = window.getComputedStyle(paragraph);
+    const rectangle = paragraph.getBoundingClientRect();
+    return style.display === 'none'
+        || style.visibility === 'hidden'
+        || style.opacity === '0'
+        || style.position === 'absolute'
+        || (rectangle.height === 0 && paragraph.textContent.trim() !== '');
+}
+
 for (const paragraph of paragraphs) {
-    if (window.getComputedStyle(paragraph).display === 'none') {
+    if (isHiddenParagraph(paragraph)) {
         for (const attribute of Array.from(paragraph.attributes)) {
             if (attribute.name.startsWith('data-')) {
                 hiddenMarkers.push([attribute.name, attribute.value]);
@@ -22,7 +32,7 @@ for (const paragraph of paragraphs) {
     const hasHiddenMarker = hiddenMarkers.some(
         ([name, value]) => paragraph.getAttribute(name) === value
     );
-    if (window.getComputedStyle(paragraph).display === 'none' || hasHiddenMarker) {
+    if (isHiddenParagraph(paragraph) || hasHiddenMarker) {
         paragraph.remove();
         continue;
     }
@@ -37,7 +47,7 @@ return document.documentElement.outerHTML;
 """
 
 PAGE_SIGNATURE_SCRIPT = """
-const content = document.querySelector('#TextContent') || document.body;
+const content = document.querySelector('#TextContent, #acontent') || document.body;
 return `${document.title}\n${content ? content.innerText : ''}`;
 """
 
@@ -117,7 +127,8 @@ class SafariBrowser:
     @staticmethod
     def _add_cache_buster(url):
         parsed = urlsplit(url)
-        if not parsed.hostname or not parsed.hostname.endswith('linovelib.com'):
+        supported_domains = ('linovelib.com', 'bilinovel.com')
+        if not parsed.hostname or not parsed.hostname.endswith(supported_domains):
             return url
 
         query = [

@@ -4,7 +4,7 @@ from backend.bilinovel.utils import *
 
 
 
-def query_chaps(book_no, browser='auto', browser_path=None):
+def query_chaps(book_no, browser='auto', browser_path=None, site='bilinovel'):
     print('未输入卷号，将返回书籍目录信息......')
     editer = None
     try:
@@ -13,6 +13,7 @@ def query_chaps(book_no, browser='auto', browser_path=None):
             book_no=book_no,
             browser=browser,
             browser_path=browser_path,
+            site=site,
         )
         print('--------------------------------')
         print(editer.book_name, editer.author)
@@ -35,7 +36,8 @@ def download_single_volume(root_path,
                            cover_signal=None,
                            edit_line_hang=None,
                            browser='auto',
-                           browser_path=None):
+                           browser_path=None,
+                           site='bilinovel'):
     editer = None
     try:
         editer = Editer(
@@ -46,6 +48,7 @@ def download_single_volume(root_path,
             num_thread=num_thread,
             browser=browser,
             browser_path=browser_path,
+            site=site,
         )
         print('正在积极地获取书籍信息....')
         success = editer.get_index_url()
@@ -88,13 +91,19 @@ def downloader_router(root_path,
                       cover_signal=None,
                       edit_line_hang=None,
                       browser='auto',
-                      browser_path=None):
+                      browser_path=None,
+                      site='bilinovel'):
     is_multi_chap = False
     if len(book_no)==0:
         print('请检查输入是否完整正确！')
         return
     elif volume_no == '':
-        query_chaps(book_no, browser=browser, browser_path=browser_path)
+        query_chaps(
+            book_no,
+            browser=browser,
+            browser_path=browser_path,
+            site=site,
+        )
         return 
     elif volume_no.isdigit():
         volume_no = int(volume_no)
@@ -135,6 +144,7 @@ def downloader_router(root_path,
                 edit_line_hang=edit_line_hang,
                 browser=browser,
                 browser_path=browser_path,
+                site=site,
             )
         print('所有下载任务都已经完成！')
     else:
@@ -151,6 +161,7 @@ def downloader_router(root_path,
             edit_line_hang=edit_line_hang,
             browser=browser,
             browser_path=browser_path,
+            site=site,
         )
     
 

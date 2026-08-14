@@ -15,6 +15,7 @@ import time
 import threading
 from concurrent.futures import ThreadPoolExecutor
 import tempfile
+from urllib.parse import urljoin
 from backend.bilinovel.browser import create_browser
 from backend.bilinovel.threading_utils import shutdown_executor
 
@@ -30,9 +31,18 @@ class Editer(object):
         num_thread=1,
         browser='auto',
         browser_path=None,
+        site='bilinovel',
     ):
 
-        self.url_head = 'https://www.linovelib.com'
+        site_name = (site or 'bilinovel').strip().lower()
+        site_urls = {
+            'bilinovel': 'https://www.bilinovel.com',
+            'linovelib': 'https://www.linovelib.com',
+        }
+        if site_name not in site_urls:
+            raise ValueError('小说站点必须是 bilinovel 或 linovelib')
+        self.site = site_name
+        self.url_head = site_urls[site_name]
         self.header = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.67 Safari/537.36 Edg/87.0.664.47', 'referer': self.url_head, 'cookie':'night=1'}
 
         self.interval = float(interval)/1000
@@ -92,7 +102,7 @@ class Editer(object):
                 url,
                 clean_hidden_paragraphs=is_main_text,
             )
-            while '<title>Access denied | www.linovelib.com used Cloudflare to restrict access</title>' in req:
+            while 'Access denied' in req and 'Cloudflare' in req:
                 print('下载频繁，触发反爬，5秒后重试....')
                 time.sleep(5)
                 req = self.browser.get_html(
@@ -156,22 +166,41 @@ class Editer(object):
         self.author = bf.find('meta', {"property": "og:novel:author"})['content']
 
         brief = bf.find('div', {"class": "book-dec Jbook-dec"})
-        brief_to_delete = brief.find('div')
-        brief_to_delete.extract() if brief_to_delete is not None else 0
-        self.brief = brief.find_all('p')[0].text
-        
+        if brief is not None:
+            brief_to_delete = brief.find('div')
+            if brief_to_delete is not None:
+                brief_to_delete.extract()
+            paragraphs = brief.find_all('p')
+            self.brief = (
+                paragraphs[0].get_text(strip=True)
+                if paragraphs else brief.get_text(strip=True)
+            )
+        else:
+            brief = bf.find('section', id='bookSummary')
+            self.brief = brief.get_text('\n', strip=True) if brief else ''
+
         book_meta = bf.find('div', class_='book-label')
-        self.publisher = book_meta.find('a', class_='label').text
-        span_tag = book_meta.find('span')
         self.tag_list = []
-        if span_tag:
-            for a_tag in span_tag.find_all('a'):
-                self.tag_list.append(a_tag.text)
-                
-        try:
-            self.cover_url_back = re.search(r'src=\"(.*?)\"', str(bf.find('div', {"class": "book-img fl"}))).group(1)
-        except:
-            self.cover_url_back = 'cid'
+        if book_meta is not None:
+            publisher = book_meta.find('a', class_='label')
+            self.publisher = publisher.get_text(strip=True) if publisher else ''
+            span_tag = book_meta.find('span')
+            if span_tag:
+                self.tag_list = [tag.get_text(strip=True) for tag in span_tag.find_all('a')]
+        else:
+            category = bf.find('meta', {"property": "og:novel:category"})
+            self.publisher = category.get('content', '') if category else ''
+            tag_group = bf.find('span', class_='tag-small-group')
+            if tag_group:
+                self.tag_list = [tag.get_text(strip=True) for tag in tag_group.find_all('a')]
+
+        cover_meta = bf.find('meta', {"property": "og:image"})
+        cover = bf.select_one('div.book-img.fl img') or bf.select_one('img.book-cover')
+        self.cover_url_back = (
+            cover_meta.get('content') if cover_meta else
+            cover.get('src') if cover else
+            'cid'
+        )
         
     def make_folder(self):
         os.makedirs(self.temp_path, exist_ok=True)
@@ -194,22 +223,35 @@ class Editer(object):
         chap_html = chap_html_list[volume_array]
 
 
-        volume_name = chap_html.find('h2', {'class': 'v-line'}).text
+        volume_title = (
+            chap_html.find('h2', class_='v-line')
+            or chap_html.select_one('.chapter-bar h3')
+        )
+        volume_name = volume_title.get_text(strip=True)
         volume_name = volume_name.replace(self.book_name + ' ', '')
         self.volume['volume_name'] = volume_name
-        chap_list = chap_html.find_all('li', {'class', 'col-4'})
+        chap_list = chap_html.find_all('li', class_='col-4')
+        if not chap_list:
+            chap_list = chap_html.select('li.jsChapter')
         for chap_html in chap_list:
-            self.volume['chap_names'].append(chap_html.text)
-            self.volume['chap_urls'].append(self.url_head + chap_html.find('a').get('href'))
+            link = chap_html.find('a')
+            self.volume['chap_names'].append(chap_html.get_text(strip=True))
+            self.volume['chap_urls'].append(urljoin(self.url_head, link.get('href')))
         return True
         
     def get_chap_list(self, is_print=True):
         cata_html = self.get_html(self.cata_page, is_gbk=False)
         bf = BeautifulSoup(cata_html, 'html.parser')
-        chap_html_list = bf.find_all('div', {'class', 'volume clearfix'})
+        chap_html_list = bf.select('div.volume.clearfix')
+        if not chap_html_list:
+            chap_html_list = bf.select('div.catalog-volume')
         if is_print:
             for chap_no, chap_html in enumerate(chap_html_list):
-                print(f'[{chap_no+1}]', chap_html.find('h2', {'class': 'v-line'}).text)
+                title = (
+                    chap_html.find('h2', class_='v-line')
+                    or chap_html.select_one('.chapter-bar h3')
+                )
+                print(f'[{chap_no+1}]', title.get_text(strip=True))
             return
         else:
             return chap_html_list
@@ -218,36 +260,52 @@ class Editer(object):
         is_tansfer_rubbish_code = 'woff2' in content_html
         # is_tansfer_rubbish_code = ('font-family: "read"' in content_html)
         bf = BeautifulSoup(content_html, 'html.parser')
-        text_with_head = bf.find('div', {'id': 'TextContent'}) 
+        text_with_head = (
+            bf.find('div', id='TextContent')
+            or bf.find('div', id='acontent')
+        )
+        if text_with_head is None:
+            raise ValueError('未找到章节正文，页面结构可能已经更新或触发了站点验证')
         
         self.remove_element(text_with_head, id='show-more-images')
         self.remove_element(text_with_head, class_='google-auto-placed ap_container')
         self.remove_element(text_with_head, class_='dag')
-        self.remove_element(text_with_head, id='hidden-images')
-        text_html = str(text_with_head)
+        for unwanted in text_with_head.select(
+            'script, ins, iframe, .csgo, .google-auto-placed, '
+            '[id^="google_ads"], [id^="div-gpt-ad"]'
+        ):
+            unwanted.decompose()
+        hidden_images = text_with_head.find(id='hidden-images')
+        if hidden_images is not None:
+            hidden_images.unwrap()
         # 删除匹配到的内容
         pattern = re.compile(r'<!--(.*?)-->', re.DOTALL)
-        text_html = pattern.sub('', text_html)
-        
-        img_urlre_list = re.findall(r"<img .*?>", text_html)
-        for img_urlre in img_urlre_list:
-            img_url_full = re.search(r'.[a-zA-Z]{3}/(.*?).(jpg|png|jpeg)', img_urlre)
-            img_url_name = img_url_full.group(1)
-            img_url_tail = img_url_full.group(0).split('.')[-1]
-            img_url = f'https://img3.readpai.com/{img_url_name}.{img_url_tail}'
+        text_html = pattern.sub('', str(text_with_head))
+
+        parsed_text = BeautifulSoup(text_html, 'html.parser')
+        for image in parsed_text.find_all('img'):
+            source = (
+                image.get('data-src')
+                or image.get('data-original')
+                or image.get('src')
+            )
+            if not source or source.startswith('data:') or source.endswith('.svg'):
+                image.decompose()
+                continue
+            img_url = urljoin(self.url_head, source)
 
             if not img_url in self.img_url_map:
                 self.img_url_map[img_url] = str(len(self.img_url_map)).zfill(2)
-            img_symbol = f'  <img alt=\"{self.img_url_map[img_url]}\" src=\"../Images/{self.img_url_map[img_url]}.jpg\"/>\n'
-            if '00' in img_symbol:
-                text_html = text_html.replace(img_urlre, '')  #默认第一张为封面图片 不写入彩页
+            image_no = self.img_url_map[img_url]
+            if image_no == '00':
+                image.decompose()  # 默认第一张为封面图片，不写入彩页
             else:
-                text_html = text_html.replace(img_urlre, img_symbol)
-                symbol_index = text_html.index(img_symbol)
-                if text_html[symbol_index-1] != '\n':
-                    text_html = text_html[:symbol_index] + '\n' + text_html[symbol_index:]
-        
-        text = BeautifulSoup(text_html, 'html.parser').find('div', id='TextContent')
+                image.attrs = {
+                    'alt': image_no,
+                    'src': f'../Images/{image_no}.jpg',
+                }
+
+        text = parsed_text.find('div', id=['TextContent', 'acontent'])
 
         #删除反爬提示元素
         match = re.findall(r'<p(\d+)>', str(text))
@@ -263,7 +321,9 @@ class Editer(object):
             text = text[:-1]
 
         msg = '<br/><br/><br/>————————————以下为告示，读者请无视——————————————<p>'
-        text = text[:text.find(msg)]
+        msg_index = text.find(msg)
+        if msg_index >= 0:
+            text = text[:msg_index]
 
         #去除乱码
         if is_tansfer_rubbish_code:
@@ -271,6 +331,8 @@ class Editer(object):
         return text
 
     def remove_element(self, bf_item, id=None, class_=None):
+        if bf_item is None:
+            return
         if id is not None:
             remove_list = bf_item.find_all(id=id)
         elif class_ is not None:
@@ -298,9 +360,27 @@ class Editer(object):
                 url = self.url_head + url_new
             else:
                 if return_next_chapter:
-                    next_chap_url = self.url_head + re.search(r'书签</a><a href="(.*?)">下一页</a>', content_html).group(1)
+                    next_chap_url = self.get_navigation_url(content_html, 'next')
                 break
         return text_chap, next_chap_url
+
+    def get_navigation_url(self, content_html, direction):
+        key = 'url_next' if direction == 'next' else 'url_previous'
+        match = re.search(rf"{key}\s*:\s*['\"](.*?)['\"]", content_html)
+        if match is None:
+            bf = BeautifulSoup(content_html, 'html.parser')
+            page = bf.find('div', class_='mlfy_page')
+            label = '下一页' if direction == 'next' else '上一页'
+            link = (
+                page.find('a', string=lambda value: value and label in value)
+                if page else None
+            )
+            href = link.get('href') if link else None
+        else:
+            href = match.group(1)
+        if not href:
+            raise ValueError(f'未找到{direction}章节链接')
+        return urljoin(self.url_head, href)
     
     def get_text(self):
         self.make_folder()   
@@ -398,8 +478,7 @@ class Editer(object):
     
     def get_prev_url(self, chap_no): #获取前一个章节的链接
         content_html = self.get_html(self.volume['chap_urls'][chap_no], is_gbk=False, is_main_text=True)
-        next_url = self.url_head + re.search(r'<div class="mlfy_page"><a href="(.*?)">上一页</a>', content_html).group(1)
-        return next_url
+        return self.get_navigation_url(content_html, 'previous')
     
     def prev_fix_url(self, chap_no, chap_num):  #反向递归修复缺失链接（后修复前），若成功修复返回True，否则返回False 
         if chap_no==chap_num-1: #最后一个章节直接选择不修复 返回False
